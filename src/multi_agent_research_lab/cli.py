@@ -90,17 +90,48 @@ def baseline(
 def multi_agent(
     query: Annotated[str, typer.Option("--query", "-q", help="Research query")],
 ) -> None:
-    """Run the multi-agent workflow skeleton."""
+    """Run the multi-agent workflow."""
 
     _init()
     state = ResearchState(request=_parse_query(query))
     workflow = MultiAgentWorkflow()
+
+    started = perf_counter()
     try:
         result = workflow.run(state)
     except StudentTodoError as exc:
         console.print(Panel.fit(str(exc), title="Expected TODO", style="yellow"))
         raise typer.Exit(code=2) from exc
-    console.print(result.model_dump_json(indent=2))
+    latency = perf_counter() - started
+
+    # Calculate aggregate tokens and cost across all agent steps
+    total_input_tokens = 0
+    total_output_tokens = 0
+    total_cost_usd = 0.0
+
+    for agent_res in result.agent_results:
+        meta = agent_res.metadata
+        total_input_tokens += meta.get("input_tokens") or 0
+        total_output_tokens += meta.get("output_tokens") or 0
+        total_cost_usd += meta.get("cost_usd") or 0.0
+
+    if result.final_answer:
+        console.print(Panel.fit(result.final_answer, title="Multi-Agent Final Report"))
+
+    routes_str = " -> ".join(result.route_history)
+    cost_str = f"${total_cost_usd:.5f}"
+
+    console.print(
+        Panel.fit(
+            f"[bold green]Latency:[/bold green] {latency:.3f}s | "
+            f"[bold blue]Tokens:[/bold blue] {total_input_tokens} in / {total_output_tokens} out | "
+            f"[bold yellow]Est. Cost:[/bold yellow] {cost_str}\n"
+            f"[bold magenta]Route History ({result.iteration} turns):[/bold magenta] {routes_str}\n"
+            f"[bold cyan]Sources Retrieved:[/bold cyan] {len(result.sources)} documents",
+            title="Multi-Agent Workflow Execution Summary",
+            style="green",
+        )
+    )
 
 
 if __name__ == "__main__":

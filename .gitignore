@@ -19,3 +19,4 @@ reports/*.md
 .gemini/
 .mcp.json
 GEMINI.md
+docs/implementation_plan.md
