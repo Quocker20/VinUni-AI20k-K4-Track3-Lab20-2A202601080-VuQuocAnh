@@ -11,3 +11,11 @@ build/
 reports/*.json
 reports/*.md
 !.gitkeep
+
+# IDE and Agent configurations
+.claude/
+.codegraph/
+.cursor/
+.gemini/
+.mcp.json
+GEMINI.md

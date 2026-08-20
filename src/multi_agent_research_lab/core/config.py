@@ -17,8 +17,35 @@ class Settings(BaseSettings):
     app_env: str = Field(default="local", validation_alias="APP_ENV")
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
 
+    openrouter_api_key: str | None = Field(default=None, validation_alias="OPENROUTER_API_KEY")
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1", validation_alias="OPENROUTER_BASE_URL"
+    )
+    openrouter_model: str = Field(
+        default="openai/gpt-4o-mini", validation_alias="OPENROUTER_MODEL"
+    )
+
     openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4o-mini", validation_alias="OPENAI_MODEL")
+
+    @property
+    def effective_api_key(self) -> str | None:
+        """Return the active API key (OpenRouter preferred, OpenAI fallback)."""
+        return self.openrouter_api_key or self.openai_api_key
+
+    @property
+    def effective_model(self) -> str:
+        """Return the active model name (OpenRouter preferred, OpenAI fallback)."""
+        if self.openrouter_api_key:
+            return self.openrouter_model
+        return self.openai_model
+
+    @property
+    def effective_base_url(self) -> str | None:
+        """Return the base URL if using OpenRouter."""
+        if self.openrouter_api_key or self.openrouter_base_url:
+            return self.openrouter_base_url
+        return None
 
     langsmith_api_key: str | None = Field(default=None, validation_alias="LANGSMITH_API_KEY")
     langsmith_project: str = Field(
