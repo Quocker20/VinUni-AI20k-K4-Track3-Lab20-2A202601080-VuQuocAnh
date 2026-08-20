@@ -1,5 +1,6 @@
 """Command-line entrypoint for the lab starter."""
 
+from time import perf_counter
 from typing import Annotated
 
 import typer
@@ -13,6 +14,7 @@ from multi_agent_research_lab.core.schemas import ResearchQuery
 from multi_agent_research_lab.core.state import ResearchState
 from multi_agent_research_lab.graph.workflow import MultiAgentWorkflow
 from multi_agent_research_lab.observability.logging import configure_logging
+from multi_agent_research_lab.services.llm_client import LLMClient
 
 app = typer.Typer(help="Multi-Agent Research Lab starter CLI")
 console = Console()
@@ -41,16 +43,47 @@ def _parse_query(query: str) -> ResearchQuery:
 def baseline(
     query: Annotated[str, typer.Option("--query", "-q", help="Research query")],
 ) -> None:
-    """Run a minimal single-agent baseline placeholder."""
+    """Run a single-agent baseline research completion."""
 
     _init()
     request = _parse_query(query)
     state = ResearchState(request=request)
-    state.final_answer = (
-        "Baseline skeleton response. TODO(student): replace this with a real single-agent "
-        "implementation and record latency/cost/quality metrics."
+
+    llm_client = LLMClient()
+    system_prompt = (
+        "You are an expert AI research assistant. Conduct comprehensive research and write a "
+        "well-structured, objective, and detailed technical summary addressing the user's request."
     )
-    console.print(Panel.fit(state.final_answer, title="Single-Agent Baseline"))
+
+    started = perf_counter()
+    response = llm_client.complete(system_prompt=system_prompt, user_prompt=request.query)
+    latency = perf_counter() - started
+
+    state.final_answer = response.content
+    state.add_trace_event(
+        "baseline_execution",
+        {
+            "latency_seconds": latency,
+            "input_tokens": response.input_tokens,
+            "output_tokens": response.output_tokens,
+            "cost_usd": response.cost_usd,
+        },
+    )
+
+    cost_str = f"${response.cost_usd:.5f}" if response.cost_usd is not None else "N/A"
+    in_tok = response.input_tokens if response.input_tokens is not None else 0
+    out_tok = response.output_tokens if response.output_tokens is not None else 0
+
+    console.print(Panel.fit(state.final_answer, title="Single-Agent Baseline Response"))
+    console.print(
+        Panel.fit(
+            f"[bold green]Latency:[/bold green] {latency:.3f}s | "
+            f"[bold blue]Tokens:[/bold blue] {in_tok} in / {out_tok} out | "
+            f"[bold yellow]Est. Cost:[/bold yellow] {cost_str}",
+            title="Baseline Performance Metrics",
+            style="cyan",
+        )
+    )
 
 
 @app.command("multi-agent")
